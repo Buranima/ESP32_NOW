@@ -72,18 +72,18 @@ struct response_data {
 
 // ฟังก์ชัน callback สำหรับการส่งข้อมูล
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("Last Packet Send Status: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+  //Serial.print("Last Packet Send Status: ");
+ // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
 // ฟังก์ชัน callback สำหรับการรับข้อมูลจากตัวลูก
 void OnDataRecv(const esp_now_recv_info *recv_info, const uint8_t *data, int len) {
-  Serial.print("Received data from MAC: ");
+  //Serial.print("Received data from MAC: ");
   for (int i = 0; i < 6; i++) {
-    Serial.printf("%02X:", recv_info->src_addr[i]);
+    //Serial.printf("%02X:", recv_info->src_addr[i]);
   }
   float receivedValue = *((float *)data);  // รับค่าทศนิยม 1 ตำแหน่ง
-  Serial.printf(" with value: %.1f\n", receivedValue);
+  //Serial.printf(" with value: %.1f\n", receivedValue);
 
   // บันทึกการตอบกลับ
   for (int i = 0; i < 50; i++) {
@@ -102,7 +102,7 @@ void setup() {
 
   // เริ่มต้น ESP-NOW
   if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
+    //Serial.println("Error initializing ESP-NOW");
     return;
   }
 
@@ -118,7 +118,7 @@ void setup() {
     peerInfo.encrypt = false;                   // ไม่เข้ารหัส
 
     if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-      Serial.println("Failed to add peer");
+      //Serial.println("Failed to add peer");
       return;
     }
 
@@ -139,12 +139,12 @@ void sendToSlave(int slaveIndex) {
     if (result == ESP_OK) {
       Serial.printf("Data sent to slave %d\n", slaveIndex + 1);
     } else {
-      Serial.println("Send failed");
+      //Serial.println("Send failed");
     }
 
     // รอการตอบกลับ
     unsigned long waitStart = millis();
-    while (millis() - waitStart < 1000) {  // รอการตอบกลับเป็นเวลา 1 วินาที
+    while (millis() - waitStart < 1) {  // รอการตอบกลับเป็นเวลา 1 วินาที
       if (responses[slaveIndex].received) {
         ackReceived = true;
         break;
@@ -155,7 +155,7 @@ void sendToSlave(int slaveIndex) {
   }
 
   if (!ackReceived) {
-    Serial.printf("No response from slave %d after 3 attempts\n", slaveIndex + 1);
+    //Serial.printf("No response from slave %d after 3 attempts\n", slaveIndex + 1);
     responses[slaveIndex].received = false;  // บันทึกว่าไม่มีการตอบกลับ
   }
 }
@@ -179,7 +179,13 @@ void loop() {
       Serial.printf("Slave %d: No response (null)\n", i + 1);
     }
   }
+  // เคลียร์ค่าของ responses หลังจากแสดงผล
+  for (int i = 0; i < 50; i++) {
+    memset(responses[i].macAddr, 0, sizeof(responses[i].macAddr));
+    responses[i].value = 0.0;
+    responses[i].received = false;
+  }
 
   // หน่วงเวลาสำหรับ loop ต่อไป
-  delay(5000);
+  delay(3000);
 }
