@@ -3,9 +3,9 @@
 #include <esp_wifi.h>  // ไลบรารีสำหรับการใช้ esp_wifi_get_mac
 
 // MAC Address ของตัวลูก
-uint8_t mac_lux[2][6] = {
+uint8_t mac_lux[50][6] = {
   { 0xa0, 0xdd, 0x6c, 0x0f, 0xe2, 0x78 },  // ตัวลูก 1
-  { 0xcc, 0xdb, 0xa7, 0x32, 0xa7, 0x74 },   // ตัวลูก 2
+  { 0xcc, 0xdb, 0xa7, 0x32, 0xa7, 0x74 },  // ตัวลูก 2
   { 0x54, 0x8a, 0x1b, 0xd7, 0x3f, 0x60 },  // ตัวลูก 3
   { 0x2e, 0xf9, 0x89, 0xc3, 0x6e, 0xb4 },  // ตัวลูก 4
   { 0x1a, 0xd0, 0x7c, 0xe4, 0x99, 0x52 },  // ตัวลูก 5
@@ -53,7 +53,7 @@ uint8_t mac_lux[2][6] = {
   { 0xb3, 0x4c, 0x60, 0x3f, 0xda, 0x86 },  // ตัวลูก 47
   { 0x5e, 0xad, 0xe1, 0x28, 0x9a, 0x4b },  // ตัวลูก 48
   { 0xc4, 0xbb, 0xf4, 0x53, 0x62, 0x12 },  // ตัวลูก 49
-  { 0xe6, 0x25, 0x6f, 0xb6, 0x14, 0x3c },  // ตัวลูก 50
+  { 0xe6, 0x25, 0x6f, 0xb6, 0x14, 0x3c }  // ตัวลูก 50
 };
 
 // ข้อมูลที่จะส่ง
@@ -63,8 +63,12 @@ typedef struct struct_message {
 
 struct_message myData;
 
-unsigned long previousMillis = 0;  // ตัวแปรสำหรับจับเวลา
-const long interval = 100;         // ตั้งเวลาเป็น 2 วินาที (2000 มิลลิวินาที)
+// เก็บข้อมูลการตอบกลับ
+struct response_data {
+  uint8_t macAddr[6];
+  float value;    // ค่าทศนิยม 1 ตำแหน่ง
+  bool received;  // บ่งบอกว่ามีการตอบกลับหรือไม่
+} responses[50];
 
 // ฟังก์ชัน callback สำหรับการส่งข้อมูล
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
@@ -78,8 +82,18 @@ void OnDataRecv(const esp_now_recv_info *recv_info, const uint8_t *data, int len
   for (int i = 0; i < 6; i++) {
     Serial.printf("%02X:", recv_info->src_addr[i]);
   }
-  Serial.print(" with data: ");
-  Serial.println(*data);  // แสดงค่าที่รับจากลูก
+  float receivedValue = *((float *)data);  // รับค่าทศนิยม 1 ตำแหน่ง
+  Serial.printf(" with value: %.1f\n", receivedValue);
+
+  // บันทึกการตอบกลับ
+  for (int i = 0; i < 50; i++) {
+    if (memcmp(recv_info->src_addr, mac_lux[i], 6) == 0) {
+      memcpy(responses[i].macAddr, recv_info->src_addr, 6);
+      responses[i].value = receivedValue;
+      responses[i].received = true;
+      break;
+    }
+  }
 }
 
 void setup() {
@@ -107,32 +121,65 @@ void setup() {
       Serial.println("Failed to add peer");
       return;
     }
+
+    // ตั้งค่าเริ่มต้นของการตอบกลับ
+    memset(responses[i].macAddr, 0, sizeof(responses[i].macAddr));
+    responses[i].value = 0.0;
+    responses[i].received = false;
+  }
+}
+
+void sendToSlave(int slaveIndex) {
+  esp_wifi_get_mac(WIFI_IF_STA, myData.macAddr);
+  int retries = 0;
+  bool ackReceived = false;
+
+  while (retries < 3 && !ackReceived) {
+    esp_err_t result = esp_now_send(mac_lux[slaveIndex], (uint8_t *)&myData, sizeof(myData));
+    if (result == ESP_OK) {
+      Serial.printf("Data sent to slave %d\n", slaveIndex + 1);
+    } else {
+      Serial.println("Send failed");
+    }
+
+    // รอการตอบกลับ
+    unsigned long waitStart = millis();
+    while (millis() - waitStart < 1000) {  // รอการตอบกลับเป็นเวลา 1 วินาที
+      if (responses[slaveIndex].received) {
+        ackReceived = true;
+        break;
+      }
+    }
+
+    retries++;
+  }
+
+  if (!ackReceived) {
+    Serial.printf("No response from slave %d after 3 attempts\n", slaveIndex + 1);
+    responses[slaveIndex].received = false;  // บันทึกว่าไม่มีการตอบกลับ
   }
 }
 
 void loop() {
-  unsigned long currentMillis = millis();
-
-  // หาก currentMillis น้อยกว่า previousMillis (เพราะถูกรีเซ็ต)
-  if (currentMillis < previousMillis) {
-    // ตั้งค่า previousMillis ใหม่เพื่อจัดการกับการรีเซ็ต
-    previousMillis = currentMillis;
+  for (int i = 0; i < 50; i++) {
+    sendToSlave(i);  // ส่งข้อมูลไปยังแต่ละตัว
+    // delay(500);  // รอเวลาระหว่างการส่ง
   }
-  // ตรวจสอบว่า 2 วินาทีผ่านไปหรือยัง
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;  // อัปเดตเวลาที่บันทึกไว้
 
-
-    // ส่ง MAC Address ของตัวแม่ไปให้ตัวลูกทุก 2 วินาที
-    esp_wifi_get_mac(WIFI_IF_STA, myData.macAddr);
-    for (int i = 0; i < 2; i++) {
-      esp_err_t result = esp_now_send(mac_lux[i], (uint8_t *)&myData, sizeof(myData));
-      if (result == ESP_OK) {
-        Serial.println("Data sent to slave");
-      } else {
-        Serial.println("Send failed");
+  // แสดงผลลัพธ์
+  Serial.println("\nResponses:");
+  for (int i = 0; i < 50; i++) {
+    if (responses[i].received) {
+      Serial.printf("Slave %d: MAC: ", i + 1);
+      for (int j = 0; j < 6; j++) {
+        Serial.printf("%02X:", responses[i].macAddr[j]);
       }
-      delayMicroseconds(30);
+      Serial.printf(" Value: %.1f\n", responses[i].value);
+    } else {
+      Serial.printf("Slave %d: No response (null)\n", i + 1);
     }
   }
+
+  // หน่วงเวลาสำหรับ loop ต่อไป
+  delay(5000);
 }
