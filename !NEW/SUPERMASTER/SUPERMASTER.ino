@@ -1,7 +1,8 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
-#include "esp_wifi.h"
+#include <esp_wifi.h>
 #include <ArduinoJson.h>
+#include <esp_now.h>
 
 // ข้อมูล WiFi
 const char* ssid = "BURANIMA";
@@ -18,14 +19,43 @@ const char* topicPublish = "CPS485/SERVER";
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-char macAddrMe[18];
+typedef struct structMessageSend {
+  uint8_t superMasterMacAddress[6];
+  uint8_t masterMacAddress[6];
+  uint8_t slaveMacAddress[6];
+  char stringMessage[8];
+} structMessageSend;
+
+structMessageSend myDataMessageSend;
+
+char macAddressMe[18];
+uint8_t noMaster[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+uint8_t macAddressADC[1][3][6] = {
+  {
+    // ชุดที่ 1
+    { 0xa0, 0xdd, 0x6c, 0x0f, 0xe2, 0x78 },  // macAddressSuperMaster
+    { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },  // macAddressMaster
+    { 0xcc, 0xdb, 0xa7, 0x32, 0xa7, 0x74 }   // macAddressSlave
+  }
+  // { // ชุดที่ 2
+  //     {0xA4, 0xB1, 0xC2, 0x01, 0x12, 0x23}, // macAddressSuperMaster
+  //     {0x34, 0x45, 0x56, 0x67, 0x78, 0x89}, // macAddressMaster
+  //     {0x67, 0x78, 0x89, 0x9A, 0xAB, 0xBC}  // macAddressSlave
+  // }
+};
+
 
 void setup() {
   Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
   setup_wifi();
   getMACAddress();
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback_mqtt);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ไม่สามารถเริ่ม ESP-NOW ได้");
+    return;
+  }
 }
 
 void setup_wifi() {
@@ -55,27 +85,22 @@ void reconnect_wifi() {
 void getMACAddress() {
   uint8_t mac[6];
   esp_wifi_get_mac(WIFI_IF_STA, mac);
-  snprintf(macAddrMe, sizeof(macAddrMe), "%02X:%02X:%02X:%02X:%02X:%02X",
+  snprintf(macAddressMe, sizeof(macAddressMe), "%02X:%02X:%02X:%02X:%02X:%02X",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   Serial.print("MAC Address: ");
-  Serial.println(macAddrMe);
-}
-
-void stringToMacArray(const char* macStr, uint8_t mac[6]) {
-    sscanf(macStr, "0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx", 
-           &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+  Serial.println(macAddressMe);
 }
 
 void reconnect_mqtt() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
-    if (client.connect(macAddrMe, mqtt_user, mqtt_pass)) {
+    if (client.connect(macAddressMe, mqtt_user, mqtt_pass)) {
       Serial.println("connected");
       client.subscribe(topicSubscribe);
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
-      delay(5000);
+      delay(500);
     }
   }
 }
@@ -99,6 +124,9 @@ void callback_mqtt(char* topicSubscribe, byte* payload, unsigned int length) {
   stringToMacArray(macString, macFromMQTT);
   Serial.println(modeString);
   Serial.println(macString);
+  if (strcmp(modeString, "Reaquestdata") == 0) {
+    sendESPNOWMessage(macFromMQTT);
+  }
 }
 
 void sendMQTTMessage(String message) {
@@ -109,13 +137,50 @@ void sendMQTTMessage(String message) {
   }
 }
 
+void sendESPNOWMessage(const uint8_t* macFromMQTT) {
+  for (int i = 0; i < 1; i++) {
+    if (memcmp(macFromMQTT, macAddressADC[i][2], 6) == 0) {
+      memcpy(myDataMessageSend.superMasterMacAddress, macAddressADC[i][0], 6);
+      memcpy(myDataMessageSend.masterMacAddress, macAddressADC[i][1], 6);
+      memcpy(myDataMessageSend.slaveMacAddress, macAddressADC[i][2], 6);
+      strcpy(myDataMessageSend.stringMessage, "null");
+      if (memcmp(noMaster, macAddressADC[i][1], 6) == 0) {
+        esp_now_peer_info_t peerInfo = {};
+        memcpy(peerInfo.peer_addr, macAddressADC[i][2], 6);
+        peerInfo.channel = 0;
+        peerInfo.encrypt = false;
+        if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+          Serial.println("Failed to add master as peer. Attempting to remove previous peer and retry.");
+          esp_now_del_peer(macAddressADC[i][2]);
+          if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+            Serial.println("Failed to add master as peer after retrying");
+            return;
+          }
+        }
+        esp_err_t resultESPNOW = esp_now_send(macAddressADC[i][2], (uint8_t*)&myDataMessageSend, sizeof(myDataMessageSend));
+        if (resultESPNOW == ESP_OK) {
+          Serial.println("Message sent successfully");
+        } else {
+          Serial.println("Message failed to send");
+        }
+      }
+      // else {
+      // }
+    }
+  }
+}
+
+void stringToMacArray(const char* macString, uint8_t mac[6]) {
+  sscanf(macString, "0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx",
+         &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
+}
+
 void loop() {
   reconnect_wifi();
   if (!client.connected()) {
     reconnect_mqtt();
   }
   client.loop();
-  // sendMQTTMessage("{\"on\":-99}");
 
   delay(5000);
 }
