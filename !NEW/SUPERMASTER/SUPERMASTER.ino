@@ -158,6 +158,7 @@ void sendESPNOWMessage(const uint8_t* macFromMQTT) {
           }
         }
         esp_err_t resultESPNOW = esp_now_send(macAddressADC[i][2], (uint8_t*)&myDataMessageSend, sizeof(myDataMessageSend));
+        //Serial.println(sizeof(myDataMessageSend));
         if (resultESPNOW == ESP_OK) {
           Serial.println("Message sent successfully");
         } else {
@@ -181,6 +182,4 @@ void loop() {
     reconnect_mqtt();
   }
   client.loop();
-
-  delay(5000);
 }

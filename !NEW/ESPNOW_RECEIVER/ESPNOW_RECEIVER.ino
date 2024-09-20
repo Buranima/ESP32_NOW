@@ -2,30 +2,45 @@
 #include <WiFi.h>
 
 // Struct ข้อมูลที่รับ
-typedef struct struct_message {
-  char a[32];
-  int b;
-  float c;
-} struct_message;
+typedef struct structMessageSend {
+  uint8_t superMasterMacAddress[6];
+  uint8_t masterMacAddress[6];
+  uint8_t slaveMacAddress[6];
+  char stringMessage[8];
+} structMessageSend;
 
 // ตัวแปรสำหรับเก็บข้อมูลที่รับ
-struct_message myData;
+structMessageSend myData;
 
 // ฟังก์ชันสำหรับ callback เมื่อรับข้อมูล
-void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
+void OnDataRecv(const esp_now_recv_info* info, const uint8_t* incomingData, int len) {
   memcpy(&myData, incomingData, sizeof(myData));
-  Serial.print("รับจาก: ");
-  Serial.print(mac[0], HEX); Serial.print(":");
-  Serial.print(mac[1], HEX); Serial.print(":");
-  Serial.print(mac[2], HEX); Serial.print(":");
-  Serial.print(mac[3], HEX); Serial.print(":");
-  Serial.print(mac[4], HEX); Serial.print(":");
-  Serial.print(mac[5], HEX);
-  Serial.println();
+
+  // Serial.print("รับจาก: ");
+  // Serial.print(info->src.addr[0], HEX); Serial.print(":");
+  // Serial.print(info->src.addr[1], HEX); Serial.print(":");
+  // Serial.print(info->src.addr[2], HEX); Serial.print(":");
+  // Serial.print(info->src.addr[3], HEX); Serial.print(":");
+  // Serial.print(info->src.addr[4], HEX); Serial.print(":");
+  // Serial.print(info->src.addr[5], HEX);
+  // Serial.println();
+
+  Serial.printf("Super Master MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", 
+    myData.superMasterMacAddress[0], myData.superMasterMacAddress[1], 
+    myData.superMasterMacAddress[2], myData.superMasterMacAddress[3], 
+    myData.superMasterMacAddress[4], myData.superMasterMacAddress[5]);
   
-  Serial.printf("ข้อความ: %s\n", myData.a);
-  Serial.printf("ตัวเลข: %d\n", myData.b);
-  Serial.printf("ค่า float: %.2f\n", myData.c);
+  Serial.printf("Master MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", 
+    myData.masterMacAddress[0], myData.masterMacAddress[1], 
+    myData.masterMacAddress[2], myData.masterMacAddress[3], 
+    myData.masterMacAddress[4], myData.masterMacAddress[5]);
+  
+  Serial.printf("Slave MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", 
+    myData.slaveMacAddress[0], myData.slaveMacAddress[1], 
+    myData.slaveMacAddress[2], myData.slaveMacAddress[3], 
+    myData.slaveMacAddress[4], myData.slaveMacAddress[5]);
+  
+  Serial.printf("ข้อความ: %s\n", myData.stringMessage);
 }
 
 void setup() {
