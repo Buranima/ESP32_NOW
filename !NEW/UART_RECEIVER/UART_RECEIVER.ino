@@ -10,7 +10,7 @@ typedef struct structMessageSend {
     uint8_t superMasterMacAddress[6];
     uint8_t masterMacAddress[6];
     uint8_t slaveMacAddress[6];
-    char stringMessage[9];  // ขยายขนาดเป็น 9 เพื่อรองรับ '\0'
+    char stringMessage[16];
 } structMessageSend;
 
 void receiveDataFromUart() {
