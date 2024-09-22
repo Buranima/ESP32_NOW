@@ -32,6 +32,8 @@ void setup() {
     uart_param_config(UART_NUM_1, &uart_config);
     uart_set_pin(UART_NUM_1, UART_TX_PIN, UART_RX_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_driver_install(UART_NUM_1, BUF_SIZE, 0, 0, NULL, 0);
+
+    Serial.begin(115200);
 }
 
 void loop() {
@@ -42,6 +44,7 @@ void loop() {
         .stringMessage = "Hello"
     };
 
-    sendDataOverUart(&message);  // ส่งข้อมูล
-    delay(1000);
+    sendDataOverUart(&message);
+    Serial.println("Send UART");
+    delay(2000);
 }

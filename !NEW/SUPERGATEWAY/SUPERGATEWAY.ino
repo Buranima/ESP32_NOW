@@ -139,21 +139,33 @@ void callback_mqtt(char* topicSubscribe, byte* payload, unsigned int length) {
     return;
   }
   const char* modeString = doc["mode"];
-  const char* macString = doc["mac"];
+  const char* macAddressString = doc["mac"];
   uint8_t macFromMQTT[6];
-  stringToMacArray(macString, macFromMQTT);
+  stringToMacArray(macAddressString, macFromMQTT);
   Serial.println(modeString);
-  Serial.println(macString);
+  Serial.println(macAddressString);
   if (strcmp(modeString, "Reaquestdata") == 0) {
     sendUARTMessage(macFromMQTT);
   }
 }
 
-void sendMQTTMessage(String message) {
-  if (client.publish(topicPublish, message.c_str())) {
-    Serial.println("Message sent successfully");
+void sendMQTTMessage() {
+  String mqttMessageSend;
+  StaticJsonDocument<200> doc;
+  char macAddressString[18];
+  snprintf(macAddressString, sizeof(macAddressString), "%02X:%02X:%02X:%02X:%02X:%02X",
+           myDataMessageSend.slaveMacAddress[0], myDataMessageSend.slaveMacAddress[1],
+           myDataMessageSend.slaveMacAddress[2], myDataMessageSend.slaveMacAddress[3],
+           myDataMessageSend.slaveMacAddress[4], myDataMessageSend.slaveMacAddress[5]);
+
+  doc["mac"] = macAddressString;
+  doc["result"] = myDataMessageSend.stringMessage;
+  serializeJson(doc, mqttMessageSend);
+
+  if (client.publish(topicPublish, mqttMessageSend.c_str())) {
+    Serial.println("Sent MQTT");
   } else {
-    Serial.println("Message failed to send");
+    Serial.println("MQTT Failed to send");
   }
 }
 
@@ -164,20 +176,42 @@ void sendUARTMessage(const uint8_t* macFromMQTT) {
       memcpy(myDataMessageSend.masterMacAddress, macAddressADC[i][1], 6);
       memcpy(myDataMessageSend.slaveMacAddress, macAddressADC[i][2], 6);
       strcpy(myDataMessageSend.stringMessage, "null");
-      if (memcmp(noMaster, macAddressADC[i][1], 6) == 0) {
-        Serial.println("Send UART");
-        uint8_t bufferUART[sizeof(myDataMessageSend)];
-        memcpy(bufferUART, &myDataMessageSend, sizeof(structMessageSend));
-        uart_write_bytes(UART_NUM_1, (const char*)bufferUART, sizeof(bufferUART));
-      }
-      // else {
-      // }
+      Serial.println("Send UART");
+      uint8_t bufferUART[sizeof(myDataMessageSend)];
+      memcpy(bufferUART, &myDataMessageSend, sizeof(structMessageSend));
+      uart_write_bytes(UART_NUM_1, (const char*)bufferUART, sizeof(bufferUART));
     }
   }
 }
 
-void stringToMacArray(const char* macString, uint8_t mac[6]) {
-  sscanf(macString, "0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx",
+void callbackUART() {
+  uint8_t bufferUART[sizeof(myDataMessageSend)];
+  int lenUART = uart_read_bytes(UART_NUM_1, bufferUART, sizeof(myDataMessageSend), 20 / portTICK_RATE_MS);
+  if (lenUART > 0) {
+    memcpy(&myDataMessageSend, bufferUART, sizeof(myDataMessageSend));
+    // แสดงผลข้อมูลที่ได้รับ
+    Serial.printf("Super Master MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  myDataMessageSend.superMasterMacAddress[0], myDataMessageSend.superMasterMacAddress[1],
+                  myDataMessageSend.superMasterMacAddress[2], myDataMessageSend.superMasterMacAddress[3],
+                  myDataMessageSend.superMasterMacAddress[4], myDataMessageSend.superMasterMacAddress[5]);
+
+    Serial.printf("Master MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  myDataMessageSend.masterMacAddress[0], myDataMessageSend.masterMacAddress[1],
+                  myDataMessageSend.masterMacAddress[2], myDataMessageSend.masterMacAddress[3],
+                  myDataMessageSend.masterMacAddress[4], myDataMessageSend.masterMacAddress[5]);
+
+    Serial.printf("Slave MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                  myDataMessageSend.slaveMacAddress[0], myDataMessageSend.slaveMacAddress[1],
+                  myDataMessageSend.slaveMacAddress[2], myDataMessageSend.slaveMacAddress[3],
+                  myDataMessageSend.slaveMacAddress[4], myDataMessageSend.slaveMacAddress[5]);
+
+    Serial.printf("String Message: %s\n", myDataMessageSend.stringMessage);
+    sendMQTTMessage();
+  }
+}
+
+void stringToMacArray(const char* macAddressString, uint8_t mac[6]) {
+  sscanf(macAddressString, "0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx",
          &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
 }
 
@@ -187,4 +221,5 @@ void loop() {
     reconnect_mqtt();
   }
   client.loop();
+  callbackUART();
 }
