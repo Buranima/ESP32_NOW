@@ -1,75 +1,57 @@
-#include <esp_now.h>
 #include <WiFi.h>
+#include <esp_now.h>
+#include <esp_wifi.h>
 
-// Struct ข้อมูลที่จะส่ง
-typedef struct struct_message {
-  char a[32];
-  int b;
-  float c;
-} struct_message;
+// โครงสร้างข้อมูลสำหรับส่งข้อมูล
+typedef struct structMessageSend {
+  uint8_t superMasterMacAddress[6];
+  uint8_t masterMacAddress[6];
+  uint8_t slaveMacAddress[6];
+  char stringMessage[8];
+} structMessageSend;
 
-// ตัวแปรสำหรับเก็บข้อมูลที่จะส่ง
-struct_message myData;
+structMessageSend myDataMessageSend;
 
-// กำหนด MAC Address ของ Receiver
-uint8_t broadcastAddress[] = {0x24, 0x6F, 0x28, 0xAA, 0xBB, 0xCC};
-
-// ฟังก์ชันสำหรับ callback เมื่อส่งข้อมูลเสร็จ
-void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("ส่งข้อมูลไปที่: ");
-  Serial.print(mac_addr[0], HEX); Serial.print(":");
-  Serial.print(mac_addr[1], HEX); Serial.print(":");
-  Serial.print(mac_addr[2], HEX); Serial.print(":");
-  Serial.print(mac_addr[3], HEX); Serial.print(":");
-  Serial.print(mac_addr[4], HEX); Serial.print(":");
-  Serial.print(mac_addr[5], HEX);
-  Serial.print(" ส่ง: ");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "สำเร็จ" : "ล้มเหลว");
-}
+// กำหนด MAC Address ของตัวรับ (ESP32 ที่จะรับข้อมูล)
+uint8_t receiverMacAddress[] = {0xcc, 0xdb, 0xa7, 0x32, 0xa6, 0x04};  // ใส่ MAC address ของตัวรับที่นี่
 
 void setup() {
-  // เริ่มต้น Serial Monitor
   Serial.begin(115200);
+  WiFi.mode(WIFI_STA);  // ตั้ง WiFi ให้ทำงานในโหมด STA (Station)
 
-  // เริ่มต้น Wi-Fi
-  WiFi.mode(WIFI_STA);
-
-  // เริ่มต้น ESP-NOW
   if (esp_now_init() != ESP_OK) {
-    Serial.println("ไม่สามารถเริ่ม ESP-NOW ได้");
+    Serial.println("ESP-NOW Init Failed");
     return;
   }
 
-  // กำหนด callback เมื่อส่งข้อมูล
-  esp_now_register_send_cb(OnDataSent);
-
-  // เพิ่ม peer (Receiver)
+  // เพิ่ม peer ที่เราจะส่งข้อมูลไป
   esp_now_peer_info_t peerInfo;
-  memcpy(peerInfo.peer_addr, broadcastAddress, 6);
+  memcpy(peerInfo.peer_addr, receiverMacAddress, 6);
   peerInfo.channel = 0;
   peerInfo.encrypt = false;
 
   if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-    Serial.println("ไม่สามารถเพิ่ม peer ได้");
+    Serial.println("Failed to add peer");
     return;
   }
 
-  // ข้อมูลที่จะส่ง
-  strcpy(myData.a, "Hello Receiver");
-  myData.b = 123;
-  myData.c = 456.78;
+  // กำหนดค่าในโครงสร้างข้อมูลที่เราจะส่ง
+  uint8_t mac[6];
+  esp_wifi_get_mac(WIFI_IF_STA, mac);
+  memcpy(myDataMessageSend.superMasterMacAddress, mac, 6);  // Super master MAC
+  memcpy(myDataMessageSend.masterMacAddress, mac, 6);      // Master MAC
+  memcpy(myDataMessageSend.slaveMacAddress, mac, 6);       // Slave MAC
+  strcpy(myDataMessageSend.stringMessage, "Hell");
+
+  // ส่งข้อมูลทุก ๆ 5 วินาที
+  esp_now_send(receiverMacAddress, (uint8_t *) &myDataMessageSend, sizeof(myDataMessageSend));
+  Serial.println("Message sent");
 }
 
 void loop() {
-  // ส่งข้อมูล
-  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) &myData, sizeof(myData));
-
-  if (result == ESP_OK) {
-    Serial.println("ส่งข้อมูลสำเร็จ");
-  } else {
-    Serial.println("ส่งข้อมูลล้มเหลว");
-  }
-
-  // รอ 2 วินาทีก่อนส่งครั้งต่อไป
-  delay(2000);
+  delay(5000);
+  
+  // ส่งข้อมูลอีกครั้งใน loop
+  esp_now_send(receiverMacAddress, (uint8_t *) &myDataMessageSend, sizeof(myDataMessageSend));
+  Serial.println("Message sent again");
 }

@@ -49,7 +49,6 @@ void setup() {
 
   // เริ่มต้น Wi-Fi
   WiFi.mode(WIFI_STA);
-  WiFi.disconnect();
 
   // เริ่มต้น ESP-NOW
   if (esp_now_init() != ESP_OK) {
