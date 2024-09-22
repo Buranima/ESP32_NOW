@@ -13,7 +13,7 @@ typedef struct structMessageSend {
 structMessageSend myDataMessageSend;
 
 // กำหนด MAC Address ของตัวรับ (ESP32 ที่จะรับข้อมูล)
-uint8_t receiverMacAddress[] = {0xcc, 0xdb, 0xa7, 0x32, 0xa6, 0x04};  // ใส่ MAC address ของตัวรับที่นี่
+uint8_t receiverMacAddress[] = { 0xcc, 0xdb, 0xa7, 0x32, 0xb1, 0x54 };  // ใส่ MAC address ของตัวรับที่นี่
 
 void setup() {
   Serial.begin(115200);
@@ -36,22 +36,23 @@ void setup() {
   }
 
   // กำหนดค่าในโครงสร้างข้อมูลที่เราจะส่ง
-  uint8_t mac[6];
-  esp_wifi_get_mac(WIFI_IF_STA, mac);
-  memcpy(myDataMessageSend.superMasterMacAddress, mac, 6);  // Super master MAC
-  memcpy(myDataMessageSend.masterMacAddress, mac, 6);      // Master MAC
-  memcpy(myDataMessageSend.slaveMacAddress, mac, 6);       // Slave MAC
-  strcpy(myDataMessageSend.stringMessage, "Hell");
+  uint8_t mac1[6] = { 0xcc, 0xdb, 0xa7, 0x32, 0xa6, 0x04 };
+  uint8_t mac2[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+  uint8_t mac3[6] = { 0xcc, 0xdb, 0xa7, 0x32, 0xb1, 0x54 };
+  memcpy(myDataMessageSend.superMasterMacAddress, mac1, 6);  // Super master MAC
+  memcpy(myDataMessageSend.masterMacAddress, mac2, 6);       // Master MAC
+  memcpy(myDataMessageSend.slaveMacAddress, mac3, 6);        // Slave MAC
+  strcpy(myDataMessageSend.stringMessage, "null");
 
   // ส่งข้อมูลทุก ๆ 5 วินาที
-  esp_now_send(receiverMacAddress, (uint8_t *) &myDataMessageSend, sizeof(myDataMessageSend));
+  esp_now_send(receiverMacAddress, (uint8_t *)&myDataMessageSend, sizeof(myDataMessageSend));
   Serial.println("Message sent");
 }
 
 void loop() {
   delay(5000);
-  
+
   // ส่งข้อมูลอีกครั้งใน loop
-  esp_now_send(receiverMacAddress, (uint8_t *) &myDataMessageSend, sizeof(myDataMessageSend));
+  esp_now_send(receiverMacAddress, (uint8_t *)&myDataMessageSend, sizeof(myDataMessageSend));
   Serial.println("Message sent again");
 }
