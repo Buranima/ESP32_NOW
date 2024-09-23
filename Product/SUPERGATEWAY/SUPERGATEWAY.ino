@@ -153,13 +153,15 @@ void sendMQTTMessage() {
   String mqttMessageSend;
   StaticJsonDocument<200> doc;
   char macAddressString[18];
+  float floatMessage;
   snprintf(macAddressString, sizeof(macAddressString), "%02X:%02X:%02X:%02X:%02X:%02X",
            myDataMessageSend.slaveMacAddress[0], myDataMessageSend.slaveMacAddress[1],
            myDataMessageSend.slaveMacAddress[2], myDataMessageSend.slaveMacAddress[3],
            myDataMessageSend.slaveMacAddress[4], myDataMessageSend.slaveMacAddress[5]);
 
+  floatMessage = atof(myDataMessageSend.stringMessage);
   doc["mac"] = macAddressString;
-  doc["result"] = myDataMessageSend.stringMessage;
+  doc["result"] = floatMessage;
   serializeJson(doc, mqttMessageSend);
 
   if (client.publish(topicPublish, mqttMessageSend.c_str())) {
