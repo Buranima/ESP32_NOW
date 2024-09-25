@@ -11,8 +11,8 @@
 #define BUF_SIZE (1024)
 
 // ข้อมูล WiFi
-const char* ssid = "Redmipin";
-const char* password = "0868316631";
+const char* ssid = "BURANIMA";
+const char* password = "12345678";
 
 // ข้อมูล MQTT
 const char* mqtt_server = "141.98.17.127";
@@ -31,34 +31,25 @@ typedef struct structMessageSend {
   uint8_t slaveMacAddress[6];
   char stringMessage[16];
 } structMessageSend;
+structMessageSend myDatasendMQTTMessage;
+structMessageSend myDatacallbackMQTT;
+structMessageSend myDatasendUARTMessage;
+structMessageSend myDatacallbackUART;
 
-structMessageSend myDataMessageSend;
-
-char macAddressMe[18];
+char macAddressMe[6];
+char valueADCChar[] = "null";
 uint8_t noMaster[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-uint8_t macAddressADC[1][3][6] = {
-  {
-    // ชุดที่ 1
-    { 0xcc, 0xdb, 0xa7, 0x33, 0x93, 0xfc },  // macAddressSuperMaster
-    { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff },  // macAddressMaster
-    { 0xcc, 0xdb, 0xa7, 0x32, 0xa7, 0x88 }   // macAddressSlave
-  }
-  // { // ชุดที่ 2
-  //     {0xA4, 0xB1, 0xC2, 0x01, 0x12, 0x23}, // macAddressSuperMaster
-  //     {0x34, 0x45, 0x56, 0x67, 0x78, 0x89}, // macAddressMaster
-  //     {0x67, 0x78, 0x89, 0x9A, 0xAB, 0xBC}  // macAddressSlave
-  // }
-};
-
+uint8_t macFromMQTT[6];
 
 void setup() {
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   setupWiFi();
+  WiFi.setTxPower(WIFI_POWER_20dBm);
   setupUART();
   getMACAddress();
   client.setServer(mqtt_server, mqtt_port);
-  client.setCallback(callback_mqtt);
+  client.setCallback(callbackMQTT);
   if (esp_now_init() != ESP_OK) {
     Serial.println("ไม่สามารถเริ่ม ESP-NOW ได้");
     return;
@@ -89,7 +80,7 @@ void setupUART() {
   uart_driver_install(UART_NUM_1, BUF_SIZE, 0, 0, NULL, 0);
 }
 
-void reconnect_wifi() {
+void reconnectWiFi() {
   if (WiFi.status() != WL_CONNECTED) {
     Serial.println("WiFi disconnected, reconnecting...");
     WiFi.disconnect();
@@ -111,7 +102,7 @@ void getMACAddress() {
   Serial.println(macAddressMe);
 }
 
-void reconnect_mqtt() {
+void reconnectMQTT() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     if (client.connect(macAddressMe, mqtt_user, mqtt_pass)) {
@@ -125,7 +116,13 @@ void reconnect_mqtt() {
   }
 }
 
-void callback_mqtt(char* topicSubscribe, byte* payload, unsigned int length) {
+void parseMacAddress(const char* macAddressString, uint8_t* macAddressArray) {
+  sscanf(macAddressString, "0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x",
+         &macAddressArray[0], &macAddressArray[1], &macAddressArray[2],
+         &macAddressArray[3], &macAddressArray[4], &macAddressArray[5]);
+}
+
+void callbackMQTT(char* topicSubscribe, byte* payload, unsigned int length) {
   String message;
   for (int i = 0; i < length; i++) {
     message += (char)payload[i];
@@ -139,13 +136,15 @@ void callback_mqtt(char* topicSubscribe, byte* payload, unsigned int length) {
     return;
   }
   const char* modeString = doc["mode"];
-  const char* macAddressString = doc["mac"];
-  uint8_t macFromMQTT[6];
-  stringToMacArray(macAddressString, macFromMQTT);
-  Serial.println(modeString);
-  Serial.println(macAddressString);
+  const char* macSuperMasterAddressString = doc["supermaster"];
+  const char* macMasterAddressString = doc["master"];
+  const char* macSlaveAddressString = doc["slave"];
   if (strcmp(modeString, "Reaquestdata") == 0) {
-    sendUARTMessage(macFromMQTT);
+    parseMacAddress(macSuperMasterAddressString, myDatacallbackMQTT.superMasterMacAddress);
+    parseMacAddress(macMasterAddressString, myDatacallbackMQTT.masterMacAddress);
+    parseMacAddress(macSlaveAddressString, myDatacallbackMQTT.slaveMacAddress);
+    memcpy(&myDatasendUARTMessage, &myDatacallbackMQTT, sizeof(myDatacallbackMQTT));
+    sendUARTMessage();
   }
 }
 
@@ -155,15 +154,22 @@ void sendMQTTMessage() {
   char macAddressString[18];
   float floatMessage;
   snprintf(macAddressString, sizeof(macAddressString), "%02X:%02X:%02X:%02X:%02X:%02X",
-           myDataMessageSend.slaveMacAddress[0], myDataMessageSend.slaveMacAddress[1],
-           myDataMessageSend.slaveMacAddress[2], myDataMessageSend.slaveMacAddress[3],
-           myDataMessageSend.slaveMacAddress[4], myDataMessageSend.slaveMacAddress[5]);
+           myDatasendMQTTMessage.slaveMacAddress[0], myDatasendMQTTMessage.slaveMacAddress[1],
+           myDatasendMQTTMessage.slaveMacAddress[2], myDatasendMQTTMessage.slaveMacAddress[3],
+           myDatasendMQTTMessage.slaveMacAddress[4], myDatasendMQTTMessage.slaveMacAddress[5]);
 
-  floatMessage = atof(myDataMessageSend.stringMessage);
+  if (memcmp(valueADCChar, myDatasendMQTTMessage.stringMessage, 6) == 0) {
+    doc["result"] = myDatasendMQTTMessage.stringMessage;
+  } else {
+    floatMessage = atof(myDatasendMQTTMessage.stringMessage);
+    doc["result"] = floatMessage;
+  }
   doc["mac"] = macAddressString;
-  doc["result"] = floatMessage;
   serializeJson(doc, mqttMessageSend);
-
+  Serial.printf("Slave MAC UART: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                myDatasendMQTTMessage.slaveMacAddress[0], myDatasendMQTTMessage.slaveMacAddress[1],
+                myDatasendMQTTMessage.slaveMacAddress[2], myDatasendMQTTMessage.slaveMacAddress[3],
+                myDatasendMQTTMessage.slaveMacAddress[4], myDatasendMQTTMessage.slaveMacAddress[5]);
   if (client.publish(topicPublish, mqttMessageSend.c_str())) {
     Serial.println("Sent MQTT");
   } else {
@@ -171,56 +177,41 @@ void sendMQTTMessage() {
   }
 }
 
-void sendUARTMessage(const uint8_t* macFromMQTT) {
-  for (int i = 0; i < 1; i++) {
-    if (memcmp(macFromMQTT, macAddressADC[i][2], 6) == 0) {
-      memcpy(myDataMessageSend.superMasterMacAddress, macAddressADC[i][0], 6);
-      memcpy(myDataMessageSend.masterMacAddress, macAddressADC[i][1], 6);
-      memcpy(myDataMessageSend.slaveMacAddress, macAddressADC[i][2], 6);
-      strcpy(myDataMessageSend.stringMessage, "null");
-      Serial.println("Send UART");
-      uint8_t bufferUART[sizeof(myDataMessageSend)];
-      memcpy(bufferUART, &myDataMessageSend, sizeof(structMessageSend));
-      uart_write_bytes(UART_NUM_1, (const char*)bufferUART, sizeof(bufferUART));
-    }
-  }
+void sendUARTMessage() {
+  strcpy(myDatasendUARTMessage.stringMessage, "null");
+  Serial.println("Send UART");
+  uint8_t bufferUART[sizeof(myDatasendUARTMessage)];
+  memcpy(bufferUART, &myDatasendUARTMessage, sizeof(myDatasendUARTMessage));
+  uart_write_bytes(UART_NUM_1, (const char*)bufferUART, sizeof(bufferUART));
 }
 
 void callbackUART() {
-  uint8_t bufferUART[sizeof(myDataMessageSend)];
-  int lenUART = uart_read_bytes(UART_NUM_1, bufferUART, sizeof(myDataMessageSend), 20 / portTICK_RATE_MS);
+  uint8_t bufferUART[sizeof(myDatacallbackUART)];
+  int lenUART = uart_read_bytes(UART_NUM_1, bufferUART, sizeof(myDatacallbackUART), 20 / portTICK_RATE_MS);
   if (lenUART > 0) {
-    memcpy(&myDataMessageSend, bufferUART, sizeof(myDataMessageSend));
-    // แสดงผลข้อมูลที่ได้รับ
+    memcpy(&myDatacallbackUART, bufferUART, sizeof(myDatacallbackUART));
     Serial.printf("Super Master MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                  myDataMessageSend.superMasterMacAddress[0], myDataMessageSend.superMasterMacAddress[1],
-                  myDataMessageSend.superMasterMacAddress[2], myDataMessageSend.superMasterMacAddress[3],
-                  myDataMessageSend.superMasterMacAddress[4], myDataMessageSend.superMasterMacAddress[5]);
-
+                  myDatacallbackUART.superMasterMacAddress[0], myDatacallbackUART.superMasterMacAddress[1],
+                  myDatacallbackUART.superMasterMacAddress[2], myDatacallbackUART.superMasterMacAddress[3],
+                  myDatacallbackUART.superMasterMacAddress[4], myDatacallbackUART.superMasterMacAddress[5]);
     Serial.printf("Master MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                  myDataMessageSend.masterMacAddress[0], myDataMessageSend.masterMacAddress[1],
-                  myDataMessageSend.masterMacAddress[2], myDataMessageSend.masterMacAddress[3],
-                  myDataMessageSend.masterMacAddress[4], myDataMessageSend.masterMacAddress[5]);
-
+                  myDatacallbackUART.masterMacAddress[0], myDatacallbackUART.masterMacAddress[1],
+                  myDatacallbackUART.masterMacAddress[2], myDatacallbackUART.masterMacAddress[3],
+                  myDatacallbackUART.masterMacAddress[4], myDatacallbackUART.masterMacAddress[5]);
     Serial.printf("Slave MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
-                  myDataMessageSend.slaveMacAddress[0], myDataMessageSend.slaveMacAddress[1],
-                  myDataMessageSend.slaveMacAddress[2], myDataMessageSend.slaveMacAddress[3],
-                  myDataMessageSend.slaveMacAddress[4], myDataMessageSend.slaveMacAddress[5]);
-
-    Serial.printf("String Message: %s\n", myDataMessageSend.stringMessage);
+                  myDatacallbackUART.slaveMacAddress[0], myDatacallbackUART.slaveMacAddress[1],
+                  myDatacallbackUART.slaveMacAddress[2], myDatacallbackUART.slaveMacAddress[3],
+                  myDatacallbackUART.slaveMacAddress[4], myDatacallbackUART.slaveMacAddress[5]);
+    Serial.printf("String Message: %s\n", myDatacallbackUART.stringMessage);
+    memcpy(&myDatasendMQTTMessage, &myDatacallbackUART, sizeof(myDatacallbackUART));
     sendMQTTMessage();
   }
 }
 
-void stringToMacArray(const char* macAddressString, uint8_t mac[6]) {
-  sscanf(macAddressString, "0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx, 0x%hhx",
-         &mac[0], &mac[1], &mac[2], &mac[3], &mac[4], &mac[5]);
-}
-
 void loop() {
-  reconnect_wifi();
+  reconnectWiFi();
   if (!client.connected()) {
-    reconnect_mqtt();
+    reconnectMQTT();
   }
   client.loop();
   callbackUART();

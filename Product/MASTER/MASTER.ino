@@ -9,10 +9,16 @@ typedef struct structMessageSend {
   uint8_t slaveMacAddress[6];
   char stringMessage[16];
 } structMessageSend;
+
 structMessageSend myDatacallbackESPNOW;
 structMessageSend myDatasendESPNOWMessage;
 
-uint8_t noMaster[] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+char messageNull[] = "null";
+int retries = 0;
+const int maxRetries = 3;
+String valueADCString;
+unsigned long previousMillis = 0;
+const long interval = 30;
 
 void callbackESPNOW(const esp_now_recv_info* info, const uint8_t* incomingData, int len) {
   memcpy(&myDatacallbackESPNOW, incomingData, sizeof(myDatacallbackESPNOW));
@@ -34,11 +40,62 @@ void callbackESPNOW(const esp_now_recv_info* info, const uint8_t* incomingData, 
 
 void sendESPNOWMessage() {
   memcpy(&myDatasendESPNOWMessage, &myDatacallbackESPNOW, sizeof(myDatacallbackESPNOW));
-  getADC();
-  if (memcmp(noMaster, myDatasendESPNOWMessage.masterMacAddress, 6) == 0) {
-    if (esp_now_is_peer_exist(myDatasendESPNOWMessage.superMasterMacAddress)) {
-      Serial.println("Peer already exists, no need to add.");
-    } else {
+  if (memcmp(messageNull, myDatasendESPNOWMessage.stringMessage, 16) == 0) {
+    if (!esp_now_is_peer_exist(myDatasendESPNOWMessage.slaveMacAddress)) {
+      esp_now_peer_info_t peerInfo;
+      memset(&peerInfo, 0, sizeof(esp_now_peer_info_t));
+      memcpy(peerInfo.peer_addr, myDatasendESPNOWMessage.slaveMacAddress, 6);
+      peerInfo.channel = 0;
+      peerInfo.encrypt = false;
+      peerInfo.ifidx = WIFI_IF_STA;
+      if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+        Serial.println("Failed to add peer");
+        return;
+      } else {
+        Serial.println("Peer added successfully.");
+      }
+    }
+    retries = 0;
+    while (retries < maxRetries) {
+      unsigned long currentMillis = millis();
+      if ((currentMillis - previousMillis >= interval) || (previousMillis > currentMillis)) {
+        previousMillis = currentMillis;
+        esp_err_t result = esp_now_send(myDatasendESPNOWMessage.slaveMacAddress, (uint8_t*)&myDatasendESPNOWMessage, sizeof(myDatasendESPNOWMessage));
+        if (result == ESP_OK) {
+          Serial.println("Message sent successfully");
+        } else {
+          Serial.printf("Error sending message: %d\n", result);
+        }
+      }
+    }
+    retries++;
+    if (retries > maxRetries) {
+      valueADCString = "null";
+      strcpy(myDatasendESPNOWMessage.stringMessage, valueADCString.c_str());
+      if (!esp_now_is_peer_exist(myDatasendESPNOWMessage.superMasterMacAddress)) {
+        esp_now_peer_info_t peerInfo;
+        memset(&peerInfo, 0, sizeof(esp_now_peer_info_t));
+        memcpy(peerInfo.peer_addr, myDatasendESPNOWMessage.superMasterMacAddress, 6);
+        peerInfo.channel = 0;
+        peerInfo.encrypt = false;
+        peerInfo.ifidx = WIFI_IF_STA;
+        if (esp_now_add_peer(&peerInfo) != ESP_OK) {
+          Serial.println("Failed to add peer");
+          return;
+        } else {
+          Serial.println("Peer added successfully.");
+        }
+      }
+      esp_err_t result = esp_now_send(myDatasendESPNOWMessage.superMasterMacAddress, (uint8_t*)&myDatasendESPNOWMessage, sizeof(myDatasendESPNOWMessage));
+      if (result == ESP_OK) {
+        Serial.println("Message sent successfully");
+      } else {
+        Serial.printf("Error sending message: %d\n", result);
+      }
+    }
+
+  } else {
+    if (!esp_now_is_peer_exist(myDatasendESPNOWMessage.superMasterMacAddress)) {
       esp_now_peer_info_t peerInfo;
       memset(&peerInfo, 0, sizeof(esp_now_peer_info_t));
       memcpy(peerInfo.peer_addr, myDatasendESPNOWMessage.superMasterMacAddress, 6);
@@ -58,37 +115,17 @@ void sendESPNOWMessage() {
     } else {
       Serial.printf("Error sending message: %d\n", result);
     }
-  } else {
-    if (esp_now_is_peer_exist(myDatasendESPNOWMessage.masterMacAddress)) {
-      Serial.println("Peer already exists, no need to add.");
-    } else {
-      esp_now_peer_info_t peerInfo;
-      memset(&peerInfo, 0, sizeof(esp_now_peer_info_t));
-      memcpy(peerInfo.peer_addr, myDatasendESPNOWMessage.masterMacAddress, 6);
-      peerInfo.channel = 0;
-      peerInfo.encrypt = false;
-      peerInfo.ifidx = WIFI_IF_STA;
-      if (esp_now_add_peer(&peerInfo) != ESP_OK) {
-        Serial.println("Failed to add peer");
-        return;
-      } else {
-        Serial.println("Peer added successfully.");
-      }
-    }
-    esp_err_t result = esp_now_send(myDatasendESPNOWMessage.masterMacAddress, (uint8_t*)&myDatasendESPNOWMessage, sizeof(myDatasendESPNOWMessage));
-    if (result == ESP_OK) {
-      Serial.println("Message sent successfully");
-    } else {
-      Serial.printf("Error sending message: %d\n", result);
-    }
   }
 }
 
-void getADC() {
-  int valueADCInt = analogRead(34);
-  float valueADCFloat = (valueADCInt / 4095.0) * 3.3;
-  String valueADCString = String(valueADCFloat, 2);
-  strcpy(myDatasendESPNOWMessage.stringMessage, valueADCString.c_str());
+void callbackSendESPNOW(const uint8_t* macAddresscallbackSendESPNOW, esp_now_send_status_t status) {
+  if (status == ESP_NOW_SEND_SUCCESS) {
+    Serial.println("ส่งข้อมูลสำเร็จ!");
+    retries = 0;
+  } else {
+    Serial.println("การส่งข้อมูลล้มเหลว!");
+    retries++;
+  }
 }
 
 void setup() {
@@ -100,6 +137,7 @@ void setup() {
   }
   esp_wifi_set_max_tx_power(84);
   esp_now_register_recv_cb(callbackESPNOW);
+  esp_now_register_send_cb(callbackSendESPNOW);
 }
 
 void loop() {
