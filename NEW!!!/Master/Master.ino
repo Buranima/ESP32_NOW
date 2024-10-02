@@ -138,6 +138,10 @@ void setupWiFi() {
     delay(500);
     Serial.print(".");
     wifiRetryCount++;
+
+    // ปิดไฟ LED
+    digitalWrite(led_PIN_1, LOW);  // ส่งสัญญาณ HIGH เพื่อเปิดไฟ LED
+    digitalWrite(led_PIN_2, LOW);  // ส่งสัญญาณ HIGH เพื่อเปิดไฟ LED
   }
 
   if (WiFi.status() == WL_CONNECTED) {
@@ -158,6 +162,7 @@ void setupWiFi() {
     Serial.println(clientId);  // แสดง MAC Address ที่ใช้เป็น clientId
   } else {
     Serial.println("\เชื่อมต่อ WiFi ไม่สำเร็จ");
+    ESP.restart();
   }
 }
 
@@ -178,6 +183,15 @@ void reconnect() {
       Serial.print(client.state());
       Serial.println("รอ 1 วินาทีก่อนลองใหม่");
       delay(1000);
+    }
+    if (WiFi.status() != WL_CONNECTED) {
+      Serial.println("ไม่ได้เชื่อมต่อ WiFi กำลังทำการเชื่อมต่อใหม่");
+
+      // ปิดไฟ LED
+      digitalWrite(led_PIN_1, LOW);  // ส่งสัญญาณ HIGH เพื่อเปิดไฟ LED
+      digitalWrite(led_PIN_2, LOW);  // ส่งสัญญาณ HIGH เพื่อเปิดไฟ LED
+
+      ESP.restart();
     }
   }
 }
@@ -269,7 +283,7 @@ void setup() {
   // ปิดไฟ LED
   digitalWrite(led_PIN_1, LOW);  // ส่งสัญญาณ HIGH เพื่อเปิดไฟ LED
   digitalWrite(led_PIN_2, LOW);  // ส่งสัญญาณ HIGH เพื่อเปิดไฟ LED
-  
+
   setupWiFi();
 
   client.setServer(mqttServer, mqttPort);
