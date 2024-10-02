@@ -26,8 +26,8 @@ WiFiClient espClient;
 PubSubClient client(espClient);
 
 typedef struct structMessageSend {
-  uint8_t superMasterMacAddress[6];
   uint8_t masterMacAddress[6];
+  uint8_t middleMacAddress[6];
   uint8_t slaveMacAddress[6];
   char stringMessage[16];
 } structMessageSend;
@@ -136,16 +136,23 @@ void callbackMQTT(char* topicSubscribe, byte* payload, unsigned int length) {
     return;
   }
   const char* modeString = doc["mode"];
-  const char* macSuperMasterAddressString = doc["supermaster"];
   const char* macMasterAddressString = doc["master"];
+  const char* macUartAddressString = doc["middle"];
   const char* macSlaveAddressString = doc["slave"];
-  if (strcmp(modeString, "Reaquestdata") == 0) {
-    parseMacAddress(macSuperMasterAddressString, myDatacallbackMQTT.superMasterMacAddress);
+  if ((memcmp(macAddressMe, myDatacallbackMQTT.masterMacAddress, 6) == 0 && strcmp(modeString, "Reaquestdata") == 0) {
     parseMacAddress(macMasterAddressString, myDatacallbackMQTT.masterMacAddress);
-    parseMacAddress(macSlaveAddressString, myDatacallbackMQTT.slaveMacAddress);
+    // parseMacAddress(macUartAddressString, myDatacallbackMQTT.uartMacAddress);
+    // parseMacAddress(macSlaveAddressString, myDatacallbackMQTT.slaveMacAddress);
     memcpy(&myDatasendUARTMessage, &myDatacallbackMQTT, sizeof(myDatacallbackMQTT));
     sendUARTMessage();
   }
+  // if (strcmp(modeString, "Reaquestdata") == 0) {
+  //   parseMacAddress(macMasterAddressString, myDatacallbackMQTT.masterMacAddress);
+  //   parseMacAddress(macUartAddressString, myDatacallbackMQTT.uartMacAddress);
+  //   parseMacAddress(macSlaveAddressString, myDatacallbackMQTT.slaveMacAddress);
+  //   memcpy(&myDatasendUARTMessage, &myDatacallbackMQTT, sizeof(myDatacallbackMQTT));
+  //   sendUARTMessage();
+  // }
 }
 
 void sendMQTTMessage() {
