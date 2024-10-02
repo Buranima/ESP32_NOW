@@ -1,6 +1,8 @@
 #include <WiFi.h>
 #include <esp_now.h>
 #include <ArduinoJson.h>
+#include <esp_wifi.h>
+#include <string.h>
 
 // กำหนดขา ADC
 const int adc_PIN_1 = 32;  // GPIO 32
@@ -161,6 +163,7 @@ void setupESPNOW() {
     Serial.println("เริ่มใช้งาน ESP-NOW ไม่สำเร็จ");
     ESP.restart();
   }
+  esp_wifi_set_max_tx_power(84);
   esp_now_register_recv_cb(onDataRecv);  // ลงทะเบียน callback สำหรับรับข้อมูล
   Serial.println("เริ่มใช้งาน ESP-NOW ได้สำเร็จ");
 }

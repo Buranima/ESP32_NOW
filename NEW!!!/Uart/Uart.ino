@@ -2,6 +2,8 @@
 #include <esp_now.h>
 #include <ArduinoJson.h>
 #include <driver/uart.h>
+#include <esp_wifi.h>
+#include <string.h>
 
 // กำหนดพอร์ต UART
 #define UART_TX_PIN 17
@@ -40,6 +42,7 @@ void setupESPNOW() {
     Serial.println("Error initializing ESP-NOW");
     return;
   }
+  esp_wifi_set_max_tx_power(84);
   esp_now_register_recv_cb(onDataRecv);  // ลงทะเบียน callback สำหรับรับข้อมูล
 }
 

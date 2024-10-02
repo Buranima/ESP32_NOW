@@ -2,6 +2,8 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include <driver/uart.h>
+#include <esp_wifi.h>
+#include <string.h>
 
 // กำหนดการเชื่อมต่อ WiFi
 const char* ssid = "BURANIMA";
@@ -126,6 +128,8 @@ void callback(char* topicServer, byte* payload, unsigned int length) {
 // ฟังก์ชั่นการเชื่อมต่อกับ WiFi
 void setupWiFi() {
   WiFi.disconnect();  // ตัดการเชื่อมต่อก่อน เพื่อป้องกันปัญหา
+  // WiFi.setTxPower(WIFI_POWER_20dBm);
+  esp_wifi_set_max_tx_power(84);
   Serial.println("กำลังเชื่อมต่อ WiFi...");
   WiFi.begin(ssid, password);
 
