@@ -4,15 +4,6 @@
 #include <esp_wifi.h>
 #include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-  uint8_t temprature_sens_read();
-#ifdef __cplusplus
-}
-#endif
-uint8_t temprature_sens_read();
-
 // กำหนดขา ADC
 const int adc_PIN_1 = 32;  // GPIO 32
 const int adc_PIN_2 = 33;  // GPIO 33
@@ -137,14 +128,17 @@ void onDataRecv(const esp_now_recv_info *info, const uint8_t *incomingData, int 
 
 // ฟังก์ชั่นสำหรับการอ่านค่า ADC
 void updateADC() {
-  temperature = (temprature_sens_read() - 32) / 1.8;
+  int adcIntValue1 = analogRead(adc_PIN_1);  // อ่านค่าจากพอร์ต ADC
+  Serial.println(adcIntValue1);
+  int adcIntValue2 = analogRead(adc_PIN_2);  // อ่านค่าจากพอร์ต ADC
+  Serial.println(adcIntValue2);
+  float adcFloatValue;
+  adcFloatValue = (adcIntValue1 + adcIntValue2) / 2.0;
+  temperature = (adcFloatValue / 4095) * 5.0;
+  temperature = 60.3 - (22.94 * temperature);  // แปลงค่า ADC เป็นอุณหภูมิ
 
   // ปัดค่า temperature ให้เป็นทศนิยม 2 ตำแหน่ง
   temperature = round(temperature * 100.0) / 100.0;
-
-  if (temperature >= 30) {
-    temperature = temperature - 18;
-  }
 
   // แสดงผลค่า temperature แบบทศนิยม 2 ตำแหน่ง
   Serial.print("อุณหภูมิที่วัดได้: ");

@@ -4,15 +4,6 @@
 #include <esp_wifi.h>
 #include <string.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-  uint8_t temprature_sens_read();
-#ifdef __cplusplus
-}
-#endif
-uint8_t temprature_sens_read();
-
 // กำหนดขา ADC
 const int adc_PIN_1 = 32;  // GPIO 32
 const int adc_PIN_2 = 33;  // GPIO 33
@@ -137,14 +128,19 @@ void onDataRecv(const esp_now_recv_info *info, const uint8_t *incomingData, int 
 
 // ฟังก์ชั่นสำหรับการอ่านค่า ADC
 void updateADC() {
-  temperature = (temprature_sens_read() - 32) / 1.8;
+  temperature = 0;
+  int adcIntValue1 = analogRead(adc_PIN_1);
+  Serial.println(adcIntValue1);
+
+  float adcFloatValue;
+  // adcFloatValue = adcIntValue1 * (3.0 / 1024.0);
+  adcFloatValue = adcIntValue1 * (3.3 / 4096.0);
+  // adcFloatValue = adcIntValue1 * (1.2 / 4096.0);
+  Serial.println(adcFloatValue);
+  adcFloatValue = adcFloatValue * 100;
 
   // ปัดค่า temperature ให้เป็นทศนิยม 2 ตำแหน่ง
-  temperature = round(temperature * 100.0) / 100.0;
-
-  if (temperature >= 30) {
-    temperature = temperature - 18;
-  }
+  temperature = round(adcFloatValue * 100.0) / 100.0;
 
   // แสดงผลค่า temperature แบบทศนิยม 2 ตำแหน่ง
   Serial.print("อุณหภูมิที่วัดได้: ");
@@ -182,10 +178,10 @@ void setup() {
   setupESPNOW();
 
   // ตั้งค่า ADC resolution (ความละเอียดของ ADC) เป็น 10 บิต
-  analogReadResolution(12);  // 0 - 1024 สำหรับ 10 บิต
+  analogReadResolution(12);
 
   // ตั้งค่า ADC Attenuation เป็น 11dB เพื่อให้ช่วงวัดได้ถึง 3.3V
-  analogSetAttenuation(ADC_11db);
+  analogSetAttenuation(ADC_6db);
 
   // ตั้งค่าขา GPIO ให้เป็น OUTPUT เพื่อควบคุม LED
   pinMode(led_PIN_1, OUTPUT);
