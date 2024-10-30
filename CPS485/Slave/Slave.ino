@@ -129,12 +129,37 @@ void onDataRecv(const esp_now_recv_info *info, const uint8_t *incomingData, int 
 // ฟังก์ชั่นสำหรับการอ่านค่า ADC
 void updateADC() {
   int adcIntValue1 = analogRead(adc_PIN_1);  // อ่านค่าจากพอร์ต ADC
+  int adcIntValue1_ml = analogReadMilliVolts(adc_PIN_1);
+  Serial.print("ADC1 ที่วัดได้: ");
   Serial.println(adcIntValue1);
+  Serial.print("ADC1 Milli Volts ที่วัดได้: ");
+  Serial.println(adcIntValue1_ml);
+
   int adcIntValue2 = analogRead(adc_PIN_2);  // อ่านค่าจากพอร์ต ADC
+  int adcIntValue2_ml = analogReadMilliVolts(adc_PIN_2);
+  Serial.print("ADC2 ที่วัดได้: ");
   Serial.println(adcIntValue2);
+  Serial.print("ADC2 Milli Volts ที่วัดได้: ");
+  Serial.println(adcIntValue2_ml);
+
   float adcFloatValue;
   adcFloatValue = (adcIntValue1 + adcIntValue2) / 2.0;
-  temperature = (adcFloatValue / 4095) * 5.0;
+  Serial.print("ADC AVG ที่วัดได้: ");
+  Serial.println(adcFloatValue);
+
+  // float adcFloatValue;
+  // adcFloatValue = (adcIntValue1_ml + adcIntValue2_ml) / 2.0;
+  // Serial.print("ADC AVG ที่วัดได้: ");
+  // Serial.println(adcFloatValue);
+
+  temperature = (adcFloatValue / 4095) * 5;
+  Serial.print("ADC Volts ที่วัดได้: ");
+  Serial.println(temperature);
+
+  // temperature = (adcFloatValue / 2450) * 5;
+  // Serial.print("ADC Volts ที่วัดได้: ");
+  // Serial.println(temperature);
+
   temperature = 60.3 - (22.94 * temperature);  // แปลงค่า ADC เป็นอุณหภูมิ
 
   // ปัดค่า temperature ให้เป็นทศนิยม 2 ตำแหน่ง
@@ -175,10 +200,19 @@ void setup() {
   // เริ่มต้น ESP-NOW
   setupESPNOW();
 
-  // ตั้งค่า ADC resolution (ความละเอียดของ ADC) เป็น 10 บิต
-  analogReadResolution(12);  // 0 - 1024 สำหรับ 10 บิต
+  // ตั้งค่า ADC resolution (ความละเอียดของ ADC) เป็น 12 บิต
+  analogReadResolution(12);  // 0 - 4096 สำหรับ 12 บิต
 
-  // ตั้งค่า ADC Attenuation เป็น 11dB เพื่อให้ช่วงวัดได้ถึง 3.3V
+  // ตั้งค่า ADC Attenuation เป็น 11dB เพื่อให้ช่วงวัดได้ถึง 0.95V
+  // analogSetAttenuation(ADC_0db);
+
+  // ตั้งค่า ADC Attenuation เป็น 11dB เพื่อให้ช่วงวัดได้ถึง 1.25V
+  // analogSetAttenuation(ADC_2_5db);
+
+  // ตั้งค่า ADC Attenuation เป็น 11dB เพื่อให้ช่วงวัดได้ถึง 1.75V
+  // analogSetAttenuation(ADC_6db);
+
+  // ตั้งค่า ADC Attenuation เป็น 11dB เพื่อให้ช่วงวัดได้ถึง 2.45V
   analogSetAttenuation(ADC_11db);
 
   // ตั้งค่าขา GPIO ให้เป็น OUTPUT เพื่อควบคุม LED
