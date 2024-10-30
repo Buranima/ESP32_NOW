@@ -6,8 +6,8 @@
 #include <string.h>
 
 // กำหนดการเชื่อมต่อ WiFi
-const char* ssid = "BURANIMA";
-const char* password = "12345678";
+const char* ssid = "techfusionlab";
+const char* password = "1234567890";
 
 // กำหนดการเชื่อมต่อ MQTT
 const char* mqttServer = "141.98.17.127";

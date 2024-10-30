@@ -135,22 +135,27 @@ void updateADC() {
   Serial.print("ADC1 Milli Volts ที่วัดได้: ");
   Serial.println(adcIntValue1_ml);
 
-  int adcIntValue2 = analogRead(adc_PIN_2);  // อ่านค่าจากพอร์ต ADC
-  int adcIntValue2_ml = analogReadMilliVolts(adc_PIN_2);
-  Serial.print("ADC2 ที่วัดได้: ");
-  Serial.println(adcIntValue2);
-  Serial.print("ADC2 Milli Volts ที่วัดได้: ");
-  Serial.println(adcIntValue2_ml);
+  // int adcIntValue2 = analogRead(adc_PIN_2);  // อ่านค่าจากพอร์ต ADC
+  // int adcIntValue2_ml = analogReadMilliVolts(adc_PIN_2);
+  // Serial.print("ADC2 ที่วัดได้: ");
+  // Serial.println(adcIntValue2);
+  // Serial.print("ADC2 Milli Volts ที่วัดได้: ");
+  // Serial.println(adcIntValue2_ml);
 
-  float adcFloatValue;
-  adcFloatValue = (adcIntValue1 + adcIntValue2) / 2.0;
-  Serial.print("ADC AVG ที่วัดได้: ");
-  Serial.println(adcFloatValue);
+  // float adcFloatValue;
+  // adcFloatValue = (adcIntValue1 + adcIntValue2) / 2.0;
+  // Serial.print("ADC AVG ที่วัดได้: ");
+  // Serial.println(adcFloatValue);
 
   // float adcFloatValue;
   // adcFloatValue = (adcIntValue1_ml + adcIntValue2_ml) / 2.0;
   // Serial.print("ADC AVG ที่วัดได้: ");
   // Serial.println(adcFloatValue);
+
+  float adcFloatValue;
+  adcFloatValue = adcIntValue1;
+  Serial.print("ADC ONE ที่วัดได้: ");
+  Serial.println(adcFloatValue);
 
   temperature = (adcFloatValue / 4095) * 5;
   Serial.print("ADC Volts ที่วัดได้: ");
