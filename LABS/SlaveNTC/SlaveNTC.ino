@@ -128,8 +128,11 @@ void onDataRecv(const esp_now_recv_info *info, const uint8_t *incomingData, int 
 
 // ฟังก์ชั่นสำหรับการอ่านค่า ADC
 void updateADC() {
-  float temperature = 1 / (log(1 / (4096. / analogRead(adc_PIN_1) - 1)) / 3950 + 1.0 / 298.15) - 273.15;
+  temperature = 1 / (log(1 / (4096. / analogRead(adc_PIN_1) - 1)) / 3950 + 1.0 / 298.15) - 273.15;
   temperature = temperature * 0.802 + 0.485;
+
+  // float tempC = 1 / (log(1 / (4096. / analogRead(NTC) - 1)) / 3950 + 1.0 / 298.15) - 273.15;
+  // tempC = tempC * 0.802 + 0.485;
 
   // ปัดค่า temperature ให้เป็นทศนิยม 2 ตำแหน่ง
   temperature = round(temperature * 100.0) / 100.0;
@@ -189,5 +192,7 @@ void setup() {
 void loop() {
   // ไม่จำเป็นต้องทำอะไรใน loop หลักเพราะใช้ ESP-NOW ผ่าน callback
   // updateADC();
-  // delay(1000);
+  // Serial.print("Client ID: ");
+  // Serial.println(clientId);
+  delay(1000);
 }
