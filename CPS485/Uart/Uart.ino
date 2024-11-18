@@ -141,7 +141,7 @@ void readUARTAndSendESPNOW() {
         Serial.println("ข้อมูลที่ส่งไปยัง Slave: " + jsonString);
         String byteString = value.as<String>();
         memcpy(macSlaveUrat, byteString.c_str(), byteString.length());
-        delayMicroseconds(300000);
+        delay(30);
         retryCount++;
       }
 
