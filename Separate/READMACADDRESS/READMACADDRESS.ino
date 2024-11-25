@@ -23,5 +23,5 @@ void setup(){
 void loop(){
   Serial.print("[DEFAULT] ESP32 Board MAC Address: ");
   readMacAddress();
-  delay(10000);
+  delay(1000);
 }
