@@ -6,11 +6,11 @@
 #include <string.h>
 
 // กำหนดการเชื่อมต่อ WiFi
-const char* ssid = "techfusionlab";
+const char* ssid = "989ait";
 const char* password = "1234567890";
 
 // กำหนดการเชื่อมต่อ MQTT
-const char* mqttServer = "141.98.17.127";
+const char* mqttServer = "vr.carotail.com";
 const int mqttPort = 28813;
 const char* mqttUser = "techlabs";
 const char* mqttPassword = "ASDzxc!@#QwE123";
